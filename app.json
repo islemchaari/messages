@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "projetduolib",
+    "slug": "projetduolib",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/frontend/assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./src/frontend/assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/frontend/assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./src/frontend/assets/favicon.png"
+    }
+  }
+}
