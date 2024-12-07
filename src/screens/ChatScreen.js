@@ -3,14 +3,12 @@ import { View, TouchableOpacity, Text, StyleSheet, Image } from 'react-native';
 import { GiftedChat } from 'react-native-gifted-chat';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { db, auth } from '../config/firebaseConfig';
-import { collection, addDoc, query, where, onSnapshot, orderBy, doc, getDoc } from '@firebase/firestore';
-
-
+import { collection, addDoc, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc } from '@firebase/firestore';
 
 const ChatScreen = ({ route, navigation }) => {
   const { user } = route.params;
   const [messages, setMessages] = useState([]);
-  const [replyTo, setReplyTo] = useState(null); // Add state for reply
+  const [replyTo, setReplyTo] = useState(null);
   const currentUser = auth.currentUser;
 
   useEffect(() => {
@@ -30,6 +28,15 @@ const ChatScreen = ({ route, navigation }) => {
         createdAt: doc.data().createdAt.toDate(),
       }));
       setMessages(messagesData);
+
+      // Marquer comme lu les messages non lus lorsque l'utilisateur les ouvre
+      snapshot.docs.forEach(async (doc) => {
+        const messageData = doc.data();
+        // Si le message est non lu et qu'il n'a pas été envoyé par l'utilisateur actuel
+        if (!messageData.isRead && messageData.receiverId === currentUser.uid && messageData.senderId !== currentUser.uid) {
+          await updateDoc(doc.ref, { isRead: true });
+        }
+      });
     });
 
     return () => unsubscribe();
@@ -48,7 +55,7 @@ const ChatScreen = ({ route, navigation }) => {
   const handleSend = async (newMessages) => {
     const writes = newMessages.map(async (msg) => {
       const senderName = await getUserName(currentUser.uid);
-      await addDoc(collection(db, 'messages'), {
+      const messageRef = await addDoc(collection(db, 'messages'), {
         _id: msg._id,
         text: msg.text,
         createdAt: new Date(),
@@ -59,15 +66,16 @@ const ChatScreen = ({ route, navigation }) => {
           _id: currentUser.uid,
           name: senderName,
         },
+        isRead: false, // Le message est initialement non lu
       });
     });
 
-    setReplyTo(null); // Reset reply after sending
+    setReplyTo(null); // Réinitialiser la barre de réponse
     await Promise.all(writes);
   };
 
   const handleReply = (message) => {
-    setReplyTo(message); // Set the message to be replied to
+    setReplyTo(message); // Enregistrer le message auquel on répond
   };
 
   const renderReplyBar = () => {
@@ -82,7 +90,7 @@ const ChatScreen = ({ route, navigation }) => {
           <Text style={styles.replyText}>{replyTo.text}</Text>
         </View>
         <TouchableOpacity
-          onPress={() => setReplyTo(null)} // Close the reply bar
+          onPress={() => setReplyTo(null)} // Fermer la barre de réponse
           style={styles.closeReplyButton}
         >
           <FontAwesome5 name="times" size={16} color="#000" />
@@ -132,7 +140,7 @@ const ChatScreen = ({ route, navigation }) => {
           <FontAwesome5 name="arrow-left" size={20} color="#000" />
         </TouchableOpacity>
         <View style={styles.userInfo}>
-          <View style={[styles.bubble, { backgroundColor: getRandomColor() }]}>
+          <View style={[styles.bubble, { backgroundColor: getRandomColor() }]} >
             <Text style={styles.bubbleText}>
               {getInitials(user.name)}
             </Text>
@@ -141,7 +149,7 @@ const ChatScreen = ({ route, navigation }) => {
         </View>
       </View>
 
-      {renderReplyBar()} {/* Render the reply bar */}
+      {renderReplyBar()} {/* Affichage de la barre de réponse */}
 
       <GiftedChat
         messages={messages}
@@ -154,16 +162,16 @@ const ChatScreen = ({ route, navigation }) => {
           const { name } = props.currentMessage.user;
           const initials = getInitials(name);
           return (
-            <View style={[styles.avatar, { backgroundColor: getRandomColor() }]}>
+            <View style={[styles.avatar, { backgroundColor: getRandomColor() }]} >
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
           );
         }}
-        renderMessageText={renderMessageText} // Customize how message text is rendered
-        onLongPress={(context, message) => handleReply(message)} // Enable reply on long press
+        renderMessageText={renderMessageText} // Personnaliser l'affichage des messages
+        onLongPress={(context, message) => handleReply(message)} // Permettre la réponse par un appui long sur un message
       />
 
-      {/* Bottom Bar */}
+      {/* Barre inférieure */}
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Feed')}>
           <FontAwesome5 name="home" size={20} color="#000" />
@@ -293,8 +301,6 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
-    
-    
   },
 });
 

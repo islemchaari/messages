@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, TextInput } from 'react-native';
 import { db, auth } from '../config/firebaseConfig';
-import { collection, query, where, onSnapshot, orderBy, getDoc, doc } from '@firebase/firestore';
+import { collection, onSnapshot, getDoc, doc, updateDoc, query, where, getDocs } from '@firebase/firestore';
 import { FontAwesome5 } from '@expo/vector-icons'; // Importer FontAwesome5
 
 const MessagesScreen = ({ navigation }) => {
@@ -10,42 +10,47 @@ const MessagesScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'messages'),
-      where('senderId', 'in', [currentUser.uid]), // Récupère les messages envoyés par l'utilisateur courant
-      orderBy('createdAt', 'desc')
-    );
+    const messagesRef = collection(db, 'messages');
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    const unsubscribe = onSnapshot(messagesRef, async (snapshot) => {
       const conversationsMap = new Map();
 
-      // Récupérer tous les messages échangés (envoyés et reçus)
-      for (const doc of snapshot.docs) {
-        const { receiverId, senderId, text, createdAt } = doc.data();
-        // Le contactId est l'autre personne avec qui l'utilisateur a échangé des messages
-        const contactId = receiverId !== currentUser.uid ? receiverId : senderId;
+      snapshot.docs.forEach((doc) => {
+        const { senderId, receiverId, text, createdAt, isRead } = doc.data();
 
-        // Si la conversation existe déjà, on garde le message le plus récent
-        if (!conversationsMap.has(contactId) || createdAt > conversationsMap.get(contactId).createdAt) {
-          conversationsMap.set(contactId, { text, createdAt, senderId });
+        if (senderId === currentUser.uid || receiverId === currentUser.uid) {
+          const contactId = senderId !== currentUser.uid ? senderId : receiverId;
+
+          // On garde le dernier message de la conversation et son statut 'isRead'
+          if (!conversationsMap.has(contactId) || createdAt > conversationsMap.get(contactId).createdAt) {
+            conversationsMap.set(contactId, { text, createdAt, senderId, receiverId, isRead });
+          }
         }
-      }
+      });
 
       const userList = [];
       for (let [userId, lastMessage] of conversationsMap) {
         const userDoc = await getDoc(doc(db, 'users', userId));
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          // Vérifie si le message a été envoyé par l'utilisateur courant ou par l'autre
           const messagePrefix = lastMessage.senderId === currentUser.uid ? 'You: ' : `${userData.name}: `;
+
+          // Comptage des messages non lus pour chaque utilisateur (uniquement pour les messages reçus)
+          const unreadCount = lastMessage.senderId !== currentUser.uid ? await countUnreadMessages(userId) : 0;
 
           userList.push({
             _id: userId,
             ...userData,
-            lastMessage: messagePrefix + lastMessage.text, // Ajout du dernier message avec préfixe
+            lastMessage: lastMessage.text ? messagePrefix + lastMessage.text : 'No message', // S'assurer que 'lastMessage' existe
+            lastMessageTime: lastMessage.createdAt,
+            isRead: lastMessage.isRead, // On conserve le statut du dernier message
+            unreadCount, // On ajoute le nombre de messages non lus (uniquement reçus)
           });
         }
       }
+
+      // Trier les conversations en fonction de 'lastMessageTime' (du plus récent au plus ancien)
+      userList.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
 
       setConversations(userList);
     });
@@ -57,6 +62,38 @@ const MessagesScreen = ({ navigation }) => {
   const filteredConversations = conversations.filter((item) => {
     return item.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
+
+  // Fonction pour compter les messages non lus d'une conversation (uniquement pour les messages reçus)
+  const countUnreadMessages = async (userId) => {
+    const messagesRef = collection(db, 'messages');
+    const q = query(
+      messagesRef,
+      where('senderId', '==', userId), // Messages envoyés par l'autre utilisateur
+      where('receiverId', '==', currentUser.uid), // Messages reçus par l'utilisateur actuel
+      where('isRead', '==', false) // Filtrer les messages non lus
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.size; // Retourne le nombre de messages non lus reçus
+  };
+
+  // Fonction pour marquer les messages comme lus lorsque la conversation est ouverte
+  const markMessagesAsRead = async (userId) => {
+    const messagesRef = collection(db, 'messages');
+    const q = query(
+      messagesRef,
+      where('senderId', 'in', [currentUser.uid, userId]),
+      where('receiverId', 'in', [currentUser.uid, userId])
+    );
+
+    const snapshot = await getDocs(q);
+    snapshot.forEach((doc) => {
+      if (doc.exists()) {
+        // Mettre à jour le champ isRead à true
+        updateDoc(doc.ref, { isRead: true });
+      }
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -71,19 +108,40 @@ const MessagesScreen = ({ navigation }) => {
       </View>
       <Text style={styles.title}>Conversations</Text>
       <FlatList
-        data={filteredConversations} // Utiliser les conversations filtrées
+        data={filteredConversations}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.conversationItem}
-            onPress={() => navigation.navigate('Chat', { user: item })}
+            onPress={() => {
+              // Marquer les messages comme lus lorsque la conversation est ouverte
+              markMessagesAsRead(item._id);
+              navigation.navigate('Chat', { user: item });
+            }}
           >
             <View style={[styles.avatar, { backgroundColor: getRandomColor() }]}>
               <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
             </View>
             <View>
               <Text style={styles.userName}>{item.name}</Text>
-              <Text style={styles.lastMessage}>{item.lastMessage}</Text> {/* Afficher le dernier message avec le préfixe */}
+              <Text
+                style={[
+                  styles.lastMessage,
+                  {
+                    fontWeight:
+                      item.isRead || item.unreadCount === 0 || item.lastMessage.startsWith('You: ')
+                        ? 'normal'
+                        : 'bold', // Ne mettre en gras que les messages non lus d'un autre utilisateur
+                  },
+                ]}
+              >
+                {item.lastMessage || 'No message'} {/* Valeur par défaut si lastMessage est undefined */}
+              </Text>
+              {item.unreadCount > 0 && item.lastMessage && item.lastMessage.senderId !== currentUser.uid && (
+                <Text style={styles.unreadCount}>
+                  {item.unreadCount} new{item.unreadCount > 1 ? 's' : ''} {/* Pluriel si plus d'un message */}
+                </Text>
+              )}
             </View>
           </TouchableOpacity>
         )}
@@ -165,8 +223,13 @@ const styles = StyleSheet.create({
   },
   lastMessage: {
     fontSize: 14,
-    color: '#555', // Couleur légèrement grisée
+    color: '#555',
     marginTop: 2,
+  },
+  unreadCount: {
+    fontSize: 12,
+    color: 'red',
+    marginTop: 4,
   },
 });
 
