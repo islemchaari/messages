@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, TextInput } from 'react-native';
 import { db, auth } from '../config/firebaseConfig';
-import { collection, onSnapshot, getDoc, doc, updateDoc, query, where, getDocs } from '@firebase/firestore';
-import { FontAwesome5 } from '@expo/vector-icons'; // Importer FontAwesome5
+import { collection, onSnapshot, getDoc, doc, updateDoc, setDoc } from '@firebase/firestore';
+import { FontAwesome5 } from '@expo/vector-icons';
 
 const MessagesScreen = ({ navigation }) => {
   const [conversations, setConversations] = useState([]);
-  const [searchQuery, setSearchQuery] = useState(''); // État pour la recherche
+  const [loading, setLoading] = useState(true);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [searchText, setSearchText] = useState(''); // State for search text
   const currentUser = auth.currentUser;
 
+  // Fonction pour récupérer les conversations et les favoris
   useEffect(() => {
     const messagesRef = collection(db, 'messages');
+    const favouriteRef = collection(db, 'favourite');
 
-    const unsubscribe = onSnapshot(messagesRef, async (snapshot) => {
+    const unsubscribeMessages = onSnapshot(messagesRef, async (snapshot) => {
       const conversationsMap = new Map();
 
       snapshot.docs.forEach((doc) => {
@@ -21,9 +25,20 @@ const MessagesScreen = ({ navigation }) => {
         if (senderId === currentUser.uid || receiverId === currentUser.uid) {
           const contactId = senderId !== currentUser.uid ? senderId : receiverId;
 
-          // On garde le dernier message de la conversation et son statut 'isRead'
+          // Garder le dernier message de la conversation
           if (!conversationsMap.has(contactId) || createdAt > conversationsMap.get(contactId).createdAt) {
             conversationsMap.set(contactId, { text, createdAt, senderId, receiverId, isRead });
+          }
+
+          // Compter les nouveaux messages (non lus)
+          if (receiverId === currentUser.uid && !isRead) {
+            const currentConv = conversationsMap.get(contactId);
+            if (!currentConv.newMessagesCount) {
+              currentConv.newMessagesCount = 1;
+            } else {
+              currentConv.newMessagesCount += 1;
+            }
+            conversationsMap.set(contactId, currentConv);
           }
         }
       });
@@ -35,87 +50,104 @@ const MessagesScreen = ({ navigation }) => {
           const userData = userDoc.data();
           const messagePrefix = lastMessage.senderId === currentUser.uid ? 'You: ' : `${userData.name}: `;
 
-          // Comptage des messages non lus pour chaque utilisateur (uniquement pour les messages reçus)
-          const unreadCount = lastMessage.senderId !== currentUser.uid ? await countUnreadMessages(userId) : 0;
+          // Vérifier si ce contact est un favori
+          const favDoc = await getDoc(doc(favouriteRef, `${currentUser.uid}_${userId}`));
+          const isFavourite = favDoc.exists() && favDoc.data().isMyFav;
 
           userList.push({
             _id: userId,
             ...userData,
-            lastMessage: lastMessage.text ? messagePrefix + lastMessage.text : 'No message', // S'assurer que 'lastMessage' existe
+            lastMessage: lastMessage.text ? messagePrefix + lastMessage.text : 'No message',
             lastMessageTime: lastMessage.createdAt,
-            isRead: lastMessage.isRead, // On conserve le statut du dernier message
-            unreadCount, // On ajoute le nombre de messages non lus (uniquement reçus)
+            isFavourite: isFavourite,
+            newMessagesCount: lastMessage.newMessagesCount || 0, // Nombre de messages non lus par conversation
           });
         }
       }
 
-      // Trier les conversations en fonction de 'lastMessageTime' (du plus récent au plus ancien)
+      // Tri par date de dernier message (antichronologique)
       userList.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
 
       setConversations(userList);
+      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeMessages(); // Cleanup on unmount
   }, [currentUser]);
 
-  // Fonction pour filtrer les conversations en fonction de la recherche
-  const filteredConversations = conversations.filter((item) => {
-    return item.name.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  // Fonction pour ajouter ou supprimer un favori
+  const toggleFavourite = async (receiverId) => {
+    const favDocRef = doc(db, 'favourite', `${currentUser.uid}_${receiverId}`);
+    const favDoc = await getDoc(favDocRef);
 
-  // Fonction pour compter les messages non lus d'une conversation (uniquement pour les messages reçus)
-  const countUnreadMessages = async (userId) => {
-    const messagesRef = collection(db, 'messages');
-    const q = query(
-      messagesRef,
-      where('senderId', '==', userId), // Messages envoyés par l'autre utilisateur
-      where('receiverId', '==', currentUser.uid), // Messages reçus par l'utilisateur actuel
-      where('isRead', '==', false) // Filtrer les messages non lus
+    if (favDoc.exists()) {
+      // Si la conversation est déjà dans les favoris, on la bascule
+      await updateDoc(favDocRef, {
+        isMyFav: !favDoc.data().isMyFav
+      });
+    } else {
+      // Si elle n'est pas encore dans les favoris, on l'ajoute
+      await setDoc(favDocRef, {
+        senderId: currentUser.uid,
+        receiverId: receiverId,
+        isMyFav: true,
+      });
+    }
+
+    // Mettre à jour l'interface
+    setConversations((prevConversations) =>
+      prevConversations.map((conv) =>
+        conv._id === receiverId
+          ? { ...conv, isFavourite: !conv.isFavourite }
+          : conv
+      )
     );
-
-    const snapshot = await getDocs(q);
-    return snapshot.size; // Retourne le nombre de messages non lus reçus
   };
 
-  // Fonction pour marquer les messages comme lus lorsque la conversation est ouverte
-  const markMessagesAsRead = async (userId) => {
-    const messagesRef = collection(db, 'messages');
-    const q = query(
-      messagesRef,
-      where('senderId', 'in', [currentUser.uid, userId]),
-      where('receiverId', 'in', [currentUser.uid, userId])
-    );
+  // Filtrer les conversations en fonction de l'état showFavorites et searchText
+  const filteredConversations = showFavorites
+    ? conversations.filter((conv) => conv.isFavourite) // Afficher uniquement les favoris
+    : conversations;
 
-    const snapshot = await getDocs(q);
-    snapshot.forEach((doc) => {
-      if (doc.exists()) {
-        // Mettre à jour le champ isRead à true
-        updateDoc(doc.ref, { isRead: true });
-      }
-    });
-  };
+  // Appliquer la recherche par nom (par ordre alphabétique)
+  const searchedConversations = filteredConversations.filter((conv) =>
+    conv.name.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  if (loading) {
+    return <Text>Loading...</Text>;
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchBarContainer}>
-        <FontAwesome5 name="search" size={18} color="#ccc" style={styles.searchIcon} />
+      <View style={styles.searchBar}>
+        <FontAwesome5 name="search" size={18} color="#888" style={styles.searchIcon} />
         <TextInput
-          style={styles.searchBar}
-          placeholder="Search"
-          value={searchQuery}
-          onChangeText={setSearchQuery} // Mettre à jour l'état de la recherche
+          style={styles.searchInput}
+          placeholder="Search by name"
+          value={searchText}
+          onChangeText={setSearchText}
         />
       </View>
-      <Text style={styles.title}>Conversations</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Conversations</Text>
+        <TouchableOpacity
+          style={styles.showFavoritesButton}
+          onPress={() => setShowFavorites(!showFavorites)} // Bascule entre l'affichage des favoris et de toutes les conversations
+        >
+          <Text style={styles.showFavoritesText}>
+            {showFavorites ? 'Show All' : 'Show Favourites'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
-        data={filteredConversations}
+        data={searchedConversations}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.conversationItem}
             onPress={() => {
-              // Marquer les messages comme lus lorsque la conversation est ouverte
-              markMessagesAsRead(item._id);
               navigation.navigate('Chat', { user: item });
             }}
           >
@@ -127,22 +159,28 @@ const MessagesScreen = ({ navigation }) => {
               <Text
                 style={[
                   styles.lastMessage,
-                  {
-                    fontWeight:
-                      item.isRead || item.unreadCount === 0 || item.lastMessage.startsWith('You: ')
-                        ? 'normal'
-                        : 'bold', // Ne mettre en gras que les messages non lus d'un autre utilisateur
-                  },
+                  item.newMessagesCount > 0 && { fontWeight: 'bold' }, // Message non lu en gras
                 ]}
               >
-                {item.lastMessage || 'No message'} {/* Valeur par défaut si lastMessage est undefined */}
+                {item.lastMessage || 'No message'}
               </Text>
-              {item.unreadCount > 0 && item.lastMessage && item.lastMessage.senderId !== currentUser.uid && (
-                <Text style={styles.unreadCount}>
-                  {item.unreadCount} new{item.unreadCount > 1 ? 's' : ''} {/* Pluriel si plus d'un message */}
+              {item.newMessagesCount > 0 && (
+                <Text style={styles.newMessagesText}>
+                  {item.newMessagesCount} new messages
                 </Text>
               )}
+              <Text style={styles.messageTime}>
+                {new Date(item.lastMessageTime.seconds * 1000).toLocaleTimeString()}
+              </Text>
             </View>
+            <TouchableOpacity onPress={() => toggleFavourite(item._id)}>
+              <FontAwesome5
+                name={item.isFavourite ? 'star' : 'star-half-alt'}
+                size={20}
+                color={item.isFavourite ? 'gold' : '#ccc'}
+                solid // Pour forcer l'icône pleine (solid)
+              />
+            </TouchableOpacity>
           </TouchableOpacity>
         )}
       />
@@ -174,28 +212,51 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 10,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
   },
-  searchBarContainer: {
+  showFavoritesButton: {
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+  },
+  showFavoritesText: {
+    fontSize: 14,
+    color: '#007bff',
+  },
+  newMessagesText: {
+    fontSize: 12,
+    color: 'red',
+    marginTop: 2,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingLeft: 10,
-    paddingRight: 10,
     marginBottom: 10,
-    height: 40,
+    borderBottomWidth: 1,
+    borderColor: '#ccc',
+    paddingBottom: 5,
   },
   searchIcon: {
     marginRight: 10,
   },
-  searchBar: {
+  searchInput: {
+    height: 40,
     flex: 1,
+    paddingLeft: 10,
     fontSize: 16,
+  },
+  messageTime: {
+    fontSize: 12,
+    color: '#aaa',
+    marginTop: 2,
   },
   conversationItem: {
     flexDirection: 'row',
@@ -225,11 +286,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555',
     marginTop: 2,
-  },
-  unreadCount: {
-    fontSize: 12,
-    color: 'red',
-    marginTop: 4,
   },
 });
 

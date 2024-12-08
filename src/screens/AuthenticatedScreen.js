@@ -7,6 +7,7 @@ import { FontAwesome5 } from '@expo/vector-icons'; // Importation des icônes
 
 const AuthenticatedScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0); // Nombre de messages non lus
   const currentUser = auth.currentUser; // Utilisateur actuellement connecté
 
   useEffect(() => {
@@ -18,6 +19,16 @@ const AuthenticatedScreen = ({ navigation }) => {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  // Logique pour calculer le nombre de messages non lus
+  useEffect(() => {
+    const unsubscribeMessages = onSnapshot(collection(db, 'messages'), (snapshot) => {
+      const unreadMessages = snapshot.docs.filter(doc => doc.data().receiverId === currentUser.uid && !doc.data().isRead);
+      setUnreadMessagesCount(unreadMessages.length); // Mettre à jour le nombre de messages non lus
+    });
+
+    return () => unsubscribeMessages();
   }, []);
 
   const handleSignOut = async () => {
@@ -51,9 +62,16 @@ const AuthenticatedScreen = ({ navigation }) => {
           placeholderTextColor="#000"
         />
         <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
-  <Image source={require('./Message.png')} style={styles.messageIcon} />
-</TouchableOpacity>
-
+          {/* Icône de message avec badge pour les nouveaux messages */}
+          <View style={styles.messageIconContainer}>
+            <FontAwesome5 name="comment-dots" size={20} color="#000" style={styles.messageIcon} />
+            {unreadMessagesCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadMessagesCount}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.friendsSuggestion}>Friends suggestion</Text>
@@ -111,7 +129,6 @@ const AuthenticatedScreen = ({ navigation }) => {
           <FontAwesome5 name="cogs" size={20} color="#000" />
           <Text style={styles.bottomText}>Settings</Text>
         </TouchableOpacity>
-        
       </View>
     </View>
   );
@@ -152,11 +169,30 @@ const styles = StyleSheet.create({
     borderRadius: 5,  // Arrondir les bords du champ
     paddingLeft: 10,  // Ajouter du padding à gauche
   },
+  messageIconContainer: {
+    position: 'relative', // Pour positionner le badge par rapport à l'icône
+  },
   messageIcon: {
     width: 20,
     height: 20,
     marginLeft: 10,  // Espacement entre champ et icône
     tintColor: "#000", // Icône en noir
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'red',
+    borderRadius: 10,
+    width: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   friendsSuggestion: {
     fontSize: 16,
@@ -212,4 +248,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AuthenticatedScreen;
+export default AuthenticatedScreen

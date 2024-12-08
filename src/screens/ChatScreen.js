@@ -4,6 +4,7 @@ import { GiftedChat } from 'react-native-gifted-chat';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { db, auth } from '../config/firebaseConfig';
 import { collection, addDoc, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc } from '@firebase/firestore';
+import * as Notifications from 'expo-notifications';  // Importer expo-notifications
 
 const ChatScreen = ({ route, navigation }) => {
   const { user } = route.params;
@@ -67,6 +68,15 @@ const ChatScreen = ({ route, navigation }) => {
           name: senderName,
         },
         isRead: false, // Le message est initialement non lu
+      });
+
+      // Envoi de la notification locale après avoir envoyé le message
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Nouveau message de ${senderName}`,
+          body: msg.text,  // Affiche le texte du message dans la notification
+        },
+        trigger: null,  // La notification apparaîtra immédiatement
       });
     });
 

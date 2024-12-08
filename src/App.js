@@ -6,6 +6,7 @@ import AuthenticatedScreen from './screens/AuthenticatedScreen';
 import ChatScreen from './screens/ChatScreen';
 import MessagesScreen from './screens/MessagesScreen';
 
+
 const Stack = createStackNavigator();
 
 export default function App() {
