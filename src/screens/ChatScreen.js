@@ -219,99 +219,154 @@ const ChatScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9F9F9', // Fond très léger et doux
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 10,
-    paddingLeft: 10,
-    paddingBottom: 10,
+    paddingTop: 16,
+    paddingLeft: 20,
+    paddingBottom: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   arrowContainer: {
-    marginRight: 10,
+    marginRight: 20,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   bubble: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFB5B5', // Couleur douce pastel
+    borderWidth: 1.5,
+    borderColor: '#FFF',
   },
   bubbleText: {
     fontSize: 18,
-    color: '#fff',
+    fontWeight: 'bold',
+    color: '#FFF',
     textAlign: 'center',
   },
   userName: {
     fontSize: 16,
-    marginLeft: 10,
-    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 12,
+    fontWeight: '600',
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFB5B5',
+    borderWidth: 1.5,
+    borderColor: '#FFF',
   },
   avatarText: {
     fontSize: 18,
-    color: '#fff',
+    color: '#FFF',
     textAlign: 'center',
   },
   bottomBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: '#ccc',
-    paddingVertical: 10,
+    paddingVertical: 16,
     backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   bottomIcon: {
-    justifyContent: 'center',
     alignItems: 'center',
   },
   bottomText: {
     fontSize: 12,
-    marginTop: 5,
+    color: '#4C6A92',
+    marginTop: 6,
+  },
+  messageText: {
+    fontSize: 14, // Réduit la taille du texte pour occuper moins d'espace
+    color: '#333',
+    marginVertical: 5,
+  },
+  messageContainer: {
+    marginBottom: 18,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  outgoingMessage: {
+    backgroundColor: '#4C6A92', // Fond bleu pour le message sortant
+    marginRight: 18,
+    marginLeft: 50,
+    paddingVertical: 6, // Réduit l'espace vertical
+    paddingHorizontal: 12, // Réduit l'espace horizontal
+    borderRadius: 14, // Réduit le rayon pour un message plus petit
+    maxWidth: '65%', // Réduit la largeur maximale du message
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  outgoingMessageText: {
+    color: '#fff', // Texte blanc sur fond bleu
+    fontSize: 14, // Taille du texte
   },
   replyBar: {
-    backgroundColor: '#f5f5f5',
-    padding: 10,
+    backgroundColor: '#E6F4FF', // Fond doux pour la réponse
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#B3CCE6',
+    marginBottom: 16,
   },
   replyPreview: {
     flex: 1,
+    marginRight: 16,
   },
   replyUserName: {
     fontWeight: 'bold',
+    color: '#4C6A92',
+    fontSize: 14,
   },
   replyText: {
     color: '#777',
+    fontSize: 14,
   },
   closeReplyButton: {
-    marginLeft: 10,
+    marginLeft: 18,
+    padding: 8,
   },
   replyContainer: {
-    marginBottom: 5,
-    backgroundColor: '#f0f0f0',
-    padding: 5,
-    borderRadius: 5,
-  },
-  messageText: {
-    fontSize: 16,
+    marginBottom: 16,
+    backgroundColor: '#F0F8FF',
+    padding: 16,
+    borderRadius: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4C6A92',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
   },
 });
+
 
 export default ChatScreen;

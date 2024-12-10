@@ -1,31 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Button, TextInput } from 'react-native'; 
 import { db, auth } from '../config/firebaseConfig';
-import { collection, onSnapshot } from '@firebase/firestore';
+import { collection, onSnapshot, query, where } from '@firebase/firestore'; // Importation des méthodes nécessaires
 import { signOut } from '@firebase/auth';
-import { FontAwesome5 } from '@expo/vector-icons'; // Importation des icônes
+import { FontAwesome5 } from '@expo/vector-icons'; 
 
 const AuthenticatedScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0); // Nombre de messages non lus
-  const currentUser = auth.currentUser; // Utilisateur actuellement connecté
+  const [unreadDiscussionsCount, setUnreadDiscussionsCount] = useState(0); // Nombre de discussions non lues
+  const currentUser = auth.currentUser; // Utilisateur connecté
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersData = snapshot.docs
-        .map((doc) => ({ ...doc.data(), _id: doc.id })) // Inclure _id pour chaque utilisateur
-        .filter((user) => user._id !== currentUser.uid); // Exclure l'utilisateur connecté
+        .map((doc) => ({ ...doc.data(), _id: doc.id }))
+        .filter((user) => user._id !== currentUser.uid); // Exclure l'utilisateur actuel
       setUsers(usersData);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Logique pour calculer le nombre de messages non lus
+  // Calcul du nombre de discussions non lues
   useEffect(() => {
-    const unsubscribeMessages = onSnapshot(collection(db, 'messages'), (snapshot) => {
-      const unreadMessages = snapshot.docs.filter(doc => doc.data().receiverId === currentUser.uid && !doc.data().isRead);
-      setUnreadMessagesCount(unreadMessages.length); // Mettre à jour le nombre de messages non lus
+    const messagesQuery = query(
+      collection(db, 'messages'), 
+      where('receiverId', '==', currentUser.uid),  // Filtrer les messages destinés à l'utilisateur connecté
+      where('isRead', '==', false)  // Filtrer ceux qui ne sont pas lus
+    );
+
+    const unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
+      // Récupérer les IDs des utilisateurs avec des messages non lus
+      const unreadUserIds = new Set();
+
+      snapshot.docs.forEach((doc) => {
+        const senderId = doc.data().senderId; // ID de l'expéditeur
+        unreadUserIds.add(senderId); // Ajouter l'ID de l'expéditeur, cela garantit qu'une discussion ne soit comptée qu'une seule fois
+      });
+
+      setUnreadDiscussionsCount(unreadUserIds.size); // Le nombre de discussions distinctes avec des messages non lus
     });
 
     return () => unsubscribeMessages();
@@ -34,13 +47,12 @@ const AuthenticatedScreen = ({ navigation }) => {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      navigation.replace('Auth'); // Naviguer vers l'écran de connexion après déconnexion
+      navigation.replace('Auth'); // Redirection après la déconnexion
     } catch (error) {
       console.error('Sign Out error:', error.message);
     }
   };
 
-  // Fonction pour générer une couleur aléatoire
   const getRandomColor = () => {
     const letters = '0123456789ABCDEF';
     let color = '#';
@@ -52,22 +64,17 @@ const AuthenticatedScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Barre de recherche avec le logo et l'icône des messages */}
+      {/* Barre de recherche et icônes */}
       <View style={styles.searchBar}>
         <Image source={require('./image 19.png')} style={styles.logo} />
-        <FontAwesome5 name="search" size={20} color="#000" style={styles.searchIcon} /> {/* Icône loupe */}
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search for something here"
-          placeholderTextColor="#000"
-        />
+        <FontAwesome5 name="search" size={20} color="#000" style={styles.searchIcon} />
+        <TextInput style={styles.searchInput} placeholder="Search for something here" placeholderTextColor="#000" />
         <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
-          {/* Icône de message avec badge pour les nouveaux messages */}
           <View style={styles.messageIconContainer}>
             <FontAwesome5 name="comment-dots" size={20} color="#000" style={styles.messageIcon} />
-            {unreadMessagesCount > 0 && (
+            {unreadDiscussionsCount > 0 && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadMessagesCount}</Text>
+                <Text style={styles.badgeText}>{unreadDiscussionsCount}</Text>
               </View>
             )}
           </View>
@@ -76,7 +83,6 @@ const AuthenticatedScreen = ({ navigation }) => {
 
       <Text style={styles.friendsSuggestion}>Friends suggestion</Text>
 
-      {/* Liste des utilisateurs */}
       <FlatList
         data={users}
         horizontal
@@ -84,10 +90,9 @@ const AuthenticatedScreen = ({ navigation }) => {
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => navigation.navigate('Chat', { user: item })}>
             <View style={styles.userCard}>
-              {/* Bulle colorée avec la première lettre de l'utilisateur */}
-              <View style={[styles.bubble, { backgroundColor: getRandomColor() }]}>
+              <View style={[styles.bubble, { backgroundColor: getRandomColor() }]} >
                 <Text style={styles.bubbleText}>
-                  {item.name ? item.name.charAt(0).toUpperCase() : 'A'}  {/* Majuscule et première lettre */}
+                  {item.name ? item.name.charAt(0).toUpperCase() : 'A'}
                 </Text>
               </View>
               <Text style={styles.userName}>{item.name || 'Unnamed User'}</Text>
@@ -96,10 +101,9 @@ const AuthenticatedScreen = ({ navigation }) => {
         )}
       />
 
-      {/* Bouton de déconnexion */}
       <Button title="Log Out" onPress={handleSignOut} color="#e74c3c" />
 
-      {/* Barre de navigation en bas */}
+      {/* Navigation en bas */}
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Feed')}>
           <FontAwesome5 name="home" size={20} color="#000" />
@@ -135,6 +139,8 @@ const AuthenticatedScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  // Ajoutez votre style ici...
+
   container: {
     flex: 1,
     padding: 16,
@@ -248,4 +254,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AuthenticatedScreen
+export default AuthenticatedScreen;

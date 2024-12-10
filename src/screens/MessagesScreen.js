@@ -11,82 +11,84 @@ const MessagesScreen = ({ navigation }) => {
   const [searchText, setSearchText] = useState(''); // State for search text
   const currentUser = auth.currentUser;
 
-  // Fonction pour récupérer les conversations et les favoris
   useEffect(() => {
     const messagesRef = collection(db, 'messages');
     const favouriteRef = collection(db, 'favourite');
-
+    
     const unsubscribeMessages = onSnapshot(messagesRef, async (snapshot) => {
       const conversationsMap = new Map();
-
+    
       snapshot.docs.forEach((doc) => {
         const { senderId, receiverId, text, createdAt, isRead } = doc.data();
-
+    
         if (senderId === currentUser.uid || receiverId === currentUser.uid) {
           const contactId = senderId !== currentUser.uid ? senderId : receiverId;
 
-          // Garder le dernier message de la conversation
-          if (!conversationsMap.has(contactId) || createdAt > conversationsMap.get(contactId).createdAt) {
-            conversationsMap.set(contactId, { text, createdAt, senderId, receiverId, isRead });
+          if (!conversationsMap.has(contactId)) {
+            conversationsMap.set(contactId, {
+              text,
+              createdAt,
+              senderId,
+              receiverId,
+              isRead,
+              newMessagesCount: 0, 
+            });
+          }
+    
+          const currentConv = conversationsMap.get(contactId);
+          
+          if (receiverId === currentUser.uid && !isRead) {
+            currentConv.newMessagesCount += 1;
           }
 
-          // Compter les nouveaux messages (non lus)
-          if (receiverId === currentUser.uid && !isRead) {
-            const currentConv = conversationsMap.get(contactId);
-            if (!currentConv.newMessagesCount) {
-              currentConv.newMessagesCount = 1;
-            } else {
-              currentConv.newMessagesCount += 1;
-            }
-            conversationsMap.set(contactId, currentConv);
+          if (createdAt > currentConv.createdAt) {
+            currentConv.text = text;
+            currentConv.createdAt = createdAt;
           }
+    
+          conversationsMap.set(contactId, currentConv);
         }
       });
-
+    
       const userList = [];
       for (let [userId, lastMessage] of conversationsMap) {
         const userDoc = await getDoc(doc(db, 'users', userId));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           const messagePrefix = lastMessage.senderId === currentUser.uid ? 'You: ' : `${userData.name}: `;
-
-          // Vérifier si ce contact est un favori
+    
           const favDoc = await getDoc(doc(favouriteRef, `${currentUser.uid}_${userId}`));
           const isFavourite = favDoc.exists() && favDoc.data().isMyFav;
-
+    
           userList.push({
             _id: userId,
             ...userData,
             lastMessage: lastMessage.text ? messagePrefix + lastMessage.text : 'No message',
             lastMessageTime: lastMessage.createdAt,
             isFavourite: isFavourite,
-            newMessagesCount: lastMessage.newMessagesCount || 0, // Nombre de messages non lus par conversation
+            newMessagesCount: lastMessage.newMessagesCount || 0,
           });
         }
       }
-
-      // Tri par date de dernier message (antichronologique)
+    
       userList.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
-
+    
       setConversations(userList);
       setLoading(false);
     });
-
-    return () => unsubscribeMessages(); // Cleanup on unmount
+  
+    return () => unsubscribeMessages();
   }, [currentUser]);
 
-  // Fonction pour ajouter ou supprimer un favori
   const toggleFavourite = async (receiverId) => {
     const favDocRef = doc(db, 'favourite', `${currentUser.uid}_${receiverId}`);
     const favDoc = await getDoc(favDocRef);
 
     if (favDoc.exists()) {
-      // Si la conversation est déjà dans les favoris, on la bascule
       await updateDoc(favDocRef, {
         isMyFav: !favDoc.data().isMyFav
       });
     } else {
-      // Si elle n'est pas encore dans les favoris, on l'ajoute
       await setDoc(favDocRef, {
         senderId: currentUser.uid,
         receiverId: receiverId,
@@ -94,7 +96,6 @@ const MessagesScreen = ({ navigation }) => {
       });
     }
 
-    // Mettre à jour l'interface
     setConversations((prevConversations) =>
       prevConversations.map((conv) =>
         conv._id === receiverId
@@ -104,12 +105,10 @@ const MessagesScreen = ({ navigation }) => {
     );
   };
 
-  // Filtrer les conversations en fonction de l'état showFavorites et searchText
   const filteredConversations = showFavorites
-    ? conversations.filter((conv) => conv.isFavourite) // Afficher uniquement les favoris
+    ? conversations.filter((conv) => conv.isFavourite)
     : conversations;
 
-  // Appliquer la recherche par nom (par ordre alphabétique)
   const searchedConversations = filteredConversations.filter((conv) =>
     conv.name.toLowerCase().includes(searchText.toLowerCase())
   );
@@ -121,7 +120,7 @@ const MessagesScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.searchBar}>
-        <FontAwesome5 name="search" size={18} color="#888" style={styles.searchIcon} />
+        <FontAwesome5 name="search" size={20} color="#888" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name"
@@ -133,7 +132,7 @@ const MessagesScreen = ({ navigation }) => {
         <Text style={styles.title}>Conversations</Text>
         <TouchableOpacity
           style={styles.showFavoritesButton}
-          onPress={() => setShowFavorites(!showFavorites)} // Bascule entre l'affichage des favoris et de toutes les conversations
+          onPress={() => setShowFavorites(!showFavorites)}
         >
           <Text style={styles.showFavoritesText}>
             {showFavorites ? 'Show All' : 'Show Favourites'}
@@ -154,12 +153,12 @@ const MessagesScreen = ({ navigation }) => {
             <View style={[styles.avatar, { backgroundColor: getRandomColor() }]}>
               <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
             </View>
-            <View>
+            <View style={styles.conversationDetails}>
               <Text style={styles.userName}>{item.name}</Text>
               <Text
                 style={[
                   styles.lastMessage,
-                  item.newMessagesCount > 0 && { fontWeight: 'bold' }, // Message non lu en gras
+                  item.newMessagesCount > 0 && { fontWeight: 'bold' },
                 ]}
               >
                 {item.lastMessage || 'No message'}
@@ -170,15 +169,15 @@ const MessagesScreen = ({ navigation }) => {
                 </Text>
               )}
               <Text style={styles.messageTime}>
-                {new Date(item.lastMessageTime.seconds * 1000).toLocaleTimeString()}
+                {formatDate(item.lastMessageTime.seconds * 1000)}
               </Text>
             </View>
             <TouchableOpacity onPress={() => toggleFavourite(item._id)}>
               <FontAwesome5
                 name={item.isFavourite ? 'star' : 'star-half-alt'}
-                size={20}
-                color={item.isFavourite ? 'gold' : '#ccc'}
-                solid // Pour forcer l'icône pleine (solid)
+                size={22}
+                color={item.isFavourite ? '#FFD700' : '#ccc'}
+                solid
               />
             </TouchableOpacity>
           </TouchableOpacity>
@@ -188,7 +187,15 @@ const MessagesScreen = ({ navigation }) => {
   );
 };
 
-// Fonction pour générer les initiales
+// Formatage de la date
+const formatDate = (timestamp) => {
+  const date = new Date(timestamp);
+  const options = { weekday: 'short', day: 'numeric', month: 'short' };
+  const day = date.toLocaleDateString('fr-FR', options); // Jour et mois
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); // Heure sans secondes
+  return `${day}, ${time}`;
+};
+
 const getInitials = (name) => {
   if (!name) return '';
   const words = name.split(' ');
@@ -196,7 +203,6 @@ const getInitials = (name) => {
   return initials.join('');
 };
 
-// Fonction pour générer une couleur aléatoire
 const getRandomColor = () => {
   const letters = '0123456789ABCDEF';
   let color = '#';
@@ -209,40 +215,46 @@ const getRandomColor = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 10,
+    backgroundColor: '#f4f7fc',
+    padding: 15,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
   },
   showFavoritesButton: {
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#1E90FF',
+    borderRadius: 25,
   },
   showFavoritesText: {
     fontSize: 14,
-    color: '#007bff',
+    color: '#fff',
   },
   newMessagesText: {
     fontSize: 12,
-    color: 'red',
+    color: '#FF6347',
     marginTop: 2,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-    paddingBottom: 5,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   },
   searchIcon: {
     marginRight: 10,
@@ -250,42 +262,50 @@ const styles = StyleSheet.create({
   searchInput: {
     height: 40,
     flex: 1,
-    paddingLeft: 10,
     fontSize: 16,
+    color: '#333',
   },
   messageTime: {
     fontSize: 12,
-    color: '#aaa',
+    color: '#888',
     marginTop: 2,
   },
   conversationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 10,
+    elevation: 2,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 15,
   },
   avatarText: {
-    fontSize: 18,
+    fontSize: 20,
     color: '#fff',
     textAlign: 'center',
   },
   userName: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
   },
   lastMessage: {
     fontSize: 14,
     color: '#555',
-    marginTop: 2,
+    marginTop: 5,
+  },
+  conversationDetails: {
+    flex: 1,
   },
 });
 
