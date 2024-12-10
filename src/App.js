@@ -5,6 +5,7 @@ import AuthScreen from './screens/AuthScreen';
 import AuthenticatedScreen from './screens/AuthenticatedScreen';
 import ChatScreen from './screens/ChatScreen';
 import MessagesScreen from './screens/MessagesScreen';
+import MyCommunityScreen from './screens/MyCommunityScreen';
 
 
 const Stack = createStackNavigator();
@@ -17,6 +18,7 @@ export default function App() {
         <Stack.Screen name="Authenticated" component={AuthenticatedScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="Messages" component={MessagesScreen} />
+        <Stack.Screen name="MyCommunity" component={MyCommunityScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

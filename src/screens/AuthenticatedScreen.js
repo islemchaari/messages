@@ -105,35 +105,36 @@ const AuthenticatedScreen = ({ navigation }) => {
 
       {/* Navigation en bas */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Feed')}>
-          <FontAwesome5 name="home" size={20} color="#000" />
-          <Text style={styles.bottomText}>Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Duo')}>
-          <FontAwesome5 name="users" size={20} color="#000" />
-          <Text style={styles.bottomText}>Duo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Community')}>
-          <FontAwesome5 name="globe" size={20} color="#000" />
-          <Text style={styles.bottomText}>Community</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Forum')}>
-          <FontAwesome5 name="comments" size={20} color="#000" />
-          <Text style={styles.bottomText}>Forum</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Notifications')}>
-          <FontAwesome5 name="bell" size={20} color="#000" />
-          <Text style={styles.bottomText}>Notifications</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Profile')}>
-          <FontAwesome5 name="user" size={20} color="#000" />
-          <Text style={styles.bottomText}>Profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Settings')}>
-          <FontAwesome5 name="cogs" size={20} color="#000" />
-          <Text style={styles.bottomText}>Settings</Text>
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Feed')}>
+    <FontAwesome5 name="home" size={20} color="#000" />
+    <Text style={styles.bottomText}>Feed</Text>
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Duo')}>
+    <FontAwesome5 name="users" size={20} color="#000" />
+    <Text style={styles.bottomText}>Duo</Text>
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('MyCommunity')}>
+    <FontAwesome5 name="globe" size={20} color="#000" />
+    <Text style={styles.bottomText}>My Community</Text>
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Forum')}>
+    <FontAwesome5 name="comments" size={20} color="#000" />
+    <Text style={styles.bottomText}>Forum</Text>
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Notifications')}>
+    <FontAwesome5 name="bell" size={20} color="#000" />
+    <Text style={styles.bottomText}>Notifications</Text>
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Profile')}>
+    <FontAwesome5 name="user" size={20} color="#000" />
+    <Text style={styles.bottomText}>Profile</Text>
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.bottomIcon} onPress={() => navigation.navigate('Settings')}>
+    <FontAwesome5 name="cogs" size={20} color="#000" />
+    <Text style={styles.bottomText}>Settings</Text>
+  </TouchableOpacity>
+</View>
+
     </View>
   );
 };
