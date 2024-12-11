@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image } from "react-native";
 import { getAuth } from "firebase/auth";
 import { db } from '../config/firebaseConfig';
 import { collection, query, where, getDocs, updateDoc, setDoc, doc } from "firebase/firestore";
@@ -12,7 +12,6 @@ const MyCommunityScreen = () => {
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
-  // Function to fetch the list of users
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true); 
@@ -132,30 +131,44 @@ const MyCommunityScreen = () => {
     const isFollowing = followingStatus.followedUsers?.includes(item.id);
     const isFollower = followingStatus.followersUsers?.includes(item.id);
 
+    const showCancerIcon = item.diseaseData?.cancer;
+    const showRareDiseaseIcon = item.diseaseData?.rareDisease;
+
     return (
       <View style={styles.userCard}>
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
         </View>
-        <Text style={styles.userName}>{item.name}</Text>
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{item.name}</Text>
+          <View style={styles.diseaseIconsContainer}>
+            {showCancerIcon && (
+              <Image source={require('./cancer.png')} style={styles.diseaseIcon} />
+            )}
+            {showRareDiseaseIcon && (
+              <Image source={require('./raredisease.png')} style={styles.diseaseIcon} />
+            )}
+          </View>
+        </View>
+        
         <View style={styles.buttonsContainer}>
           {!isFollowing && isFollower && (
-            <TouchableOpacity style={[styles.followButton, styles.hoverEffect]} onPress={() => handleFollow(item.id)}>
+            <TouchableOpacity style={styles.followButton} onPress={() => handleFollow(item.id)}>
               <Text style={styles.followText}>Follow Back</Text>
             </TouchableOpacity>
           )}
           {!isFollowing && !isFollower && (
-            <TouchableOpacity style={[styles.followButton, styles.hoverEffect]} onPress={() => handleFollow(item.id)}>
+            <TouchableOpacity style={styles.followButton} onPress={() => handleFollow(item.id)}>
               <Text style={styles.followText}>Follow</Text>
             </TouchableOpacity>
           )}
           {isFollowing && (
-            <TouchableOpacity style={[styles.disabledButton, styles.hoverEffect]} disabled={true}>
+            <TouchableOpacity style={styles.disabledButton} disabled={true}>
               <Text style={styles.followingText}>Following</Text>
             </TouchableOpacity>
           )}
           {isFollowing && (
-            <TouchableOpacity style={[styles.unfollowButton, styles.hoverEffect]} onPress={() => handleUnfollow(item.id)}>
+            <TouchableOpacity style={styles.unfollowButton} onPress={() => handleUnfollow(item.id)}>
               <Text style={styles.unfollowText}>Unfollow</Text>
             </TouchableOpacity>
           )}
@@ -169,6 +182,15 @@ const MyCommunityScreen = () => {
       <Text style={styles.header}>My Community</Text>
       <View style={styles.tabsContainer}>
         <TouchableOpacity
+          style={[styles.tab, selectedTab === 'followSuggestions' && styles.activeTab]}
+          onPress={() => setSelectedTab('followSuggestions')}
+        >
+          <Text style={[styles.tabText, selectedTab === 'followSuggestions' && styles.activeTabText]}>Follow Suggestions</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.tabsContainerRow}>
+        <TouchableOpacity
           style={[styles.tab, selectedTab === 'peopleIFollow' && styles.activeTab]}
           onPress={() => setSelectedTab('peopleIFollow')}
         >
@@ -179,12 +201,6 @@ const MyCommunityScreen = () => {
           onPress={() => setSelectedTab('followers')}
         >
           <Text style={[styles.tabText, selectedTab === 'followers' && styles.activeTabText]}>Followers</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'followSuggestions' && styles.activeTab]}
-          onPress={() => setSelectedTab('followSuggestions')}
-        >
-          <Text style={[styles.tabText, selectedTab === 'followSuggestions' && styles.activeTabText]}>Follow Suggestions</Text>
         </TouchableOpacity>
       </View>
 
@@ -214,118 +230,119 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f4f6f9',
+    backgroundColor: '#f9f9f9',
   },
   header: {
-    fontSize: 26,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '600',
     marginBottom: 20,
     textAlign: 'center',
     color: '#333',
   },
   tabsContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     marginBottom: 20,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+  },
+  tabsContainerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   tab: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 15,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    alignItems: 'center',
-    width: '28%',
+    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: '#e0e0e0',
   },
   activeTab: {
     backgroundColor: '#007bff',
-    shadowColor: '#007bff',
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
   },
   tabText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#555',
+    color: '#333',
   },
   activeTabText: {
     color: '#fff',
   },
   userCard: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
-    padding: 20,
-    marginBottom: 15,
-    borderRadius: 15,
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
-    flexDirection: 'row',
+    elevation: 2,
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   avatarContainer: {
-    backgroundColor: '#007bff',
-    borderRadius: 30,
     width: 50,
     height: 50,
-    justifyContent: 'center',
+    borderRadius: 25,
+    backgroundColor: '#007bff',
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 15,
   },
   avatarText: {
-    color: '#fff',
     fontSize: 24,
-    fontWeight: 'bold',
+    color: '#fff',
+  },
+  userInfo: {
+    flex: 1,
   },
   userName: {
     fontSize: 18,
-    fontWeight: '500',
-    flex: 1,
-    color: '#333',
+    fontWeight: '600',
+  },
+  diseaseIconsContainer: {
+    flexDirection: 'row',
+    marginTop: 5,
+  },
+  diseaseIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 5,
   },
   buttonsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   followButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 6,
+    backgroundColor: '#28a745', // Green color for Follow button
+    paddingVertical: 8,
     paddingHorizontal: 15,
-    borderRadius: 10,
-    marginLeft: 5,
+    borderRadius: 20,
   },
-  followingText: {
-    color: '#fff',
-    fontSize: 14,
+  followBackButton: {
+    backgroundColor: '#28a745', // Green color for Follow Back button
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
   },
   followText: {
     color: '#fff',
-    fontSize: 14,
+  },
+  disabledButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  followingText: {
+    color: '#666',
   },
   unfollowButton: {
-    backgroundColor: '#e74c3c',
-    paddingVertical: 6,
     paddingHorizontal: 15,
-    borderRadius: 10,
-    marginLeft: 5,
+    paddingVertical: 8,
+    backgroundColor: '#f44336',
+    borderRadius: 20,
   },
   unfollowText: {
     color: '#fff',
-    fontSize: 14,
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    paddingVertical: 6,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    marginLeft: 5,
-  },
-  hoverEffect: {
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
   },
 });
 
